@@ -1,0 +1,662 @@
+-- GAG EXTREME FPS OPTIMIZER V2
+-- FIXED:
+-- 1) Performance monitor can be dragged
+-- 2) Floating ⚡ icon ONLY toggles the optimizer GUI
+--    It no longer hides the performance monitor
+-- 3) × on optimizer GUI only hides the optimizer GUI
+-- 4) Performance monitor stays independent
+
+local Players=game:GetService("Players")
+local UIS=game:GetService("UserInputService")
+local RunService=game:GetService("RunService")
+local Stats=game:GetService("Stats")
+local Lighting=game:GetService("Lighting")
+local Workspace=game:GetService("Workspace")
+local Player=Players.LocalPlayer
+local PlayerGui=Player:WaitForChild("PlayerGui")
+
+local C={
+ HidePlants=false,HideFruits=false,HideDecorations=false,HidePets=false,
+ PetEffects=true,HideOtherPlayers=false,HideEverything=false,
+ DisableVFX=true,DisableShadows=true,DisablePost=true,LowGraphics=true
+}
+local Saved={}
+
+local function save(o,p)
+ if not o then return end
+ Saved[o]=Saved[o] or {}
+ if Saved[o][p]==nil then
+  local ok,v=pcall(function() return o[p] end)
+  if ok then Saved[o][p]=v end
+ end
+end
+
+local function set(o,p,v)
+ save(o,p)
+ pcall(function() o[p]=v end)
+end
+
+local function restore()
+ for o,t in pairs(Saved) do
+  if o and o.Parent then
+   for p,v in pairs(t) do
+    pcall(function() o[p]=v end)
+   end
+  end
+ end
+ table.clear(Saved)
+end
+
+local function has(n,list)
+ n=string.lower(tostring(n or ""))
+ for _,w in ipairs(list) do
+  if string.find(n,string.lower(w),1,true) then
+   return true
+  end
+ end
+ return false
+end
+
+local Plants={"plant","plants","crop","crops","tree","flower","bush","shrub","seedling","farmplant","grownplant","gardenplant"}
+local Fruits={"fruit","apple","banana","mango","coconut","blueberry","strawberry","grape","watermelon","pumpkin","carrot","tomato","corn","cactus","pineapple","pear","peach","avocado","lemon","orange"}
+local Decor={"decor","decoration","ornament","cosmetic","prop","interior","furniture","chair","bench","table","sofa","couch","seat","stool","shelf","cabinet","drawer","fountain","statue","sculpture","pond","rock","stone","lamp","lantern","sign","flag","banner","flowerpot","plantpot","pot","vase","fence","gate","arch","pillar","carpet","rug","toy","present","gift","balloon","mailbox","well","bridge"}
+local Pets={"pet","pets","dilo","rainbowdilo","rainbow dilo","thunderbirb","thunderbird","rainbowthunderbirb","rainbow thunder birb","rainbow thunder bird","lion","peacock","griffin","french fry","hot dog","dog","cat","bunny","rabbit","bee","dragon","monkey","fox","chicken","bear","parrot","penguin"}
+local PetFX={"effect","effects","vfx","ray","rays","beam","beams","trail","trails","particle","particles","aura","orb","orbs","sphere","ball","bubble","circle","ring","rings","glow","laser","halo","shockwave"}
+local Protect={"island","map","world","mainland","terrain","ocean","sea","water","spawn","lobby"}
+
+local function localChar(o)
+ return Player.Character and o:IsDescendantOf(Player.Character) or false
+end
+
+local function isPet(o)
+ local x=o
+ for _=1,8 do
+  if not x then break end
+  if has(x.Name,Pets) then return true end
+  x=x.Parent
+ end
+ return false
+end
+
+local function otherChar(o)
+ for _,p in ipairs(Players:GetPlayers()) do
+  if p~=Player and p.Character and o:IsDescendantOf(p.Character) then
+   return not isPet(o)
+  end
+ end
+ return false
+end
+
+local function protected(o)
+ if o:IsA("Terrain") or o:IsA("Camera") or localChar(o) then return true end
+ local x=o
+ while x.Parent and x.Parent~=Workspace do
+  x=x.Parent
+ end
+ return has(x.Name,Protect)
+end
+
+local function hide(o)
+ if o:IsA("BasePart") then
+  set(o,"LocalTransparencyModifier",1)
+  set(o,"CastShadow",false)
+ elseif o:IsA("Decal") or o:IsA("Texture") then
+  set(o,"Transparency",1)
+ elseif o:IsA("ParticleEmitter") then
+  set(o,"Enabled",false)
+  pcall(function() o:Clear() end)
+  set(o,"LocalTransparencyModifier",1)
+ elseif o:IsA("Beam") or o:IsA("Trail") then
+  set(o,"Enabled",false)
+  set(o,"LocalTransparencyModifier",1)
+ elseif o:IsA("Fire") or o:IsA("Smoke") or o:IsA("Sparkles") or o:IsA("Highlight") then
+  set(o,"Enabled",false)
+ elseif o:IsA("PointLight") or o:IsA("SpotLight") or o:IsA("SurfaceLight") then
+  set(o,"Enabled",false)
+ end
+end
+
+local function hideModel(o)
+ hide(o)
+ for _,x in ipairs(o:GetDescendants()) do
+  hide(x)
+ end
+end
+
+local function process(o)
+ if localChar(o) then return end
+
+ if C.DisableVFX then
+  if o:IsA("ParticleEmitter") then
+   set(o,"Enabled",false)
+   pcall(function() o:Clear() end)
+   set(o,"LocalTransparencyModifier",1)
+  elseif o:IsA("Beam") or o:IsA("Trail") then
+   set(o,"Enabled",false)
+   set(o,"LocalTransparencyModifier",1)
+  elseif o:IsA("Fire") or o:IsA("Smoke") or o:IsA("Sparkles") or o:IsA("Highlight") then
+   set(o,"Enabled",false)
+  elseif o:IsA("PointLight") or o:IsA("SpotLight") or o:IsA("SurfaceLight") then
+   set(o,"Enabled",false)
+  end
+ end
+
+ if C.PetEffects and (isPet(o) or has(o.Name,PetFX)) and
+  (o:IsA("ParticleEmitter") or o:IsA("Beam") or o:IsA("Trail") or
+   o:IsA("Fire") or o:IsA("Smoke") or o:IsA("Sparkles") or o:IsA("Highlight")) then
+  hide(o)
+ end
+
+ if C.HidePlants and has(o.Name,Plants) then hide(o);return end
+ if C.HideFruits and has(o.Name,Fruits) then hide(o);return end
+ if C.HidePets and isPet(o) then hide(o);return end
+ if C.HideOtherPlayers and otherChar(o) then hide(o);return end
+ if C.HideDecorations and has(o.Name,Decor) then hideModel(o);return end
+
+ if C.HideEverything and not protected(o) and not isPet(o) then
+  if o:IsA("BasePart") or o:IsA("Decal") or o:IsA("Texture") or
+     o:IsA("ParticleEmitter") or o:IsA("Beam") or o:IsA("Trail") or
+     o:IsA("Fire") or o:IsA("Smoke") or o:IsA("Sparkles") or o:IsA("Highlight") then
+   hide(o)
+  end
+ end
+end
+
+local scanning=false
+local function scan()
+ if scanning then return end
+ scanning=true
+ task.spawn(function()
+  for i,o in ipairs(Workspace:GetDescendants()) do
+   pcall(process,o)
+   if i%150==0 then task.wait() end
+  end
+  scanning=false
+ end)
+end
+
+local oldQuality
+pcall(function() oldQuality=settings().Rendering.QualityLevel end)
+local oldShadows=Lighting.GlobalShadows
+
+local function graphics()
+ if C.LowGraphics then
+  pcall(function() settings().Rendering.QualityLevel=Enum.QualityLevel.Level01 end)
+ elseif oldQuality then
+  pcall(function() settings().Rendering.QualityLevel=oldQuality end)
+ end
+end
+
+local function shadows()
+ if C.DisableShadows then
+  set(Lighting,"GlobalShadows",false)
+  task.spawn(function()
+   for i,o in ipairs(Workspace:GetDescendants()) do
+    if o:IsA("BasePart") then set(o,"CastShadow",false) end
+    if i%200==0 then task.wait() end
+   end
+  end)
+ end
+end
+
+local function post()
+ for _,o in ipairs(Lighting:GetDescendants()) do
+  if o:IsA("PostEffect") then
+   set(o,"Enabled",not C.DisablePost)
+  elseif o:IsA("Clouds") then
+   set(o,"Enabled",not C.DisablePost)
+  end
+ end
+end
+
+local function optimize()
+ graphics()
+ if C.DisableShadows then shadows() end
+ post()
+ scan()
+end
+
+-- GUI
+local G=Instance.new("ScreenGui")
+G.Name="GAG_ExtremeFPS_V2"
+G.ResetOnSpawn=false
+G.IgnoreGuiInset=true
+G.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+G.Parent=PlayerGui
+
+-- Main optimizer GUI
+local M=Instance.new("Frame")
+M.Size=UDim2.fromOffset(370,560)
+M.Position=UDim2.new(.5,-185,.5,-280)
+M.BackgroundColor3=Color3.fromRGB(22,22,22)
+M.BorderSizePixel=0
+M.Visible=true
+M.Parent=G
+Instance.new("UICorner",M).CornerRadius=UDim.new(0,12)
+
+local T=Instance.new("Frame")
+T.Size=UDim2.new(1,0,0,45)
+T.BackgroundColor3=Color3.fromRGB(34,34,34)
+T.Parent=M
+
+local title=Instance.new("TextLabel")
+title.Size=UDim2.new(1,-80,1,0)
+title.Position=UDim2.fromOffset(12,0)
+title.BackgroundTransparency=1
+title.Text="⚡ GAG EXTREME FPS V2"
+title.TextColor3=Color3.new(1,1,1)
+title.TextSize=16
+title.Font=Enum.Font.GothamBold
+title.TextXAlignment=Enum.TextXAlignment.Left
+title.Parent=T
+
+local min=Instance.new("TextButton")
+min.Size=UDim2.fromOffset(35,35)
+min.Position=UDim2.new(1,-75,0,5)
+min.BackgroundTransparency=1
+min.Text="-"
+min.TextColor3=Color3.new(1,1,1)
+min.TextSize=22
+min.Parent=T
+
+local close=Instance.new("TextButton")
+close.Size=UDim2.fromOffset(35,35)
+close.Position=UDim2.new(1,-38,0,5)
+close.BackgroundTransparency=1
+close.Text="×"
+close.TextColor3=Color3.new(1,1,1)
+close.TextSize=22
+close.Parent=T
+
+local S=Instance.new("ScrollingFrame")
+S.Size=UDim2.new(1,-20,1,-92)
+S.Position=UDim2.fromOffset(10,52)
+S.BackgroundTransparency=1
+S.BorderSizePixel=0
+S.ScrollBarThickness=5
+S.CanvasSize=UDim2.fromOffset(0,0)
+S.Parent=M
+
+local L=Instance.new("UIListLayout")
+L.Padding=UDim.new(0,7)
+L.Parent=S
+
+local status=Instance.new("TextLabel")
+status.Size=UDim2.new(1,-20,0,28)
+status.Position=UDim2.new(0,10,1,-34)
+status.BackgroundTransparency=1
+status.Text="Status: Ready"
+status.TextColor3=Color3.fromRGB(100,255,120)
+status.TextSize=12
+status.Font=Enum.Font.GothamBold
+status.TextXAlignment=Enum.TextXAlignment.Left
+status.Parent=M
+
+L:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+ S.CanvasSize=UDim2.fromOffset(0,L.AbsoluteContentSize.Y+10)
+end)
+
+local function stat(x)
+ status.Text="Status: "..x
+end
+
+local function button(txt)
+ local b=Instance.new("TextButton")
+ b.Size=UDim2.new(1,-10,0,40)
+ b.BackgroundColor3=Color3.fromRGB(40,40,40)
+ b.BorderSizePixel=0
+ b.TextColor3=Color3.new(1,1,1)
+ b.TextSize=13
+ b.Font=Enum.Font.GothamBold
+ b.Text=txt
+ b.AutoButtonColor=true
+ b.Active=true
+ b.Selectable=true
+ b.Parent=S
+ Instance.new("UICorner",b).CornerRadius=UDim.new(0,8)
+ return b
+end
+
+local function label(b,n,v)
+ b.Text=n..": "..(v and "ON" or "OFF")
+ b.BackgroundColor3=v and Color3.fromRGB(35,95,50) or Color3.fromRGB(40,40,40)
+end
+
+local PB=button("")
+local FB=button("")
+local DB=button("")
+local PetB=button("")
+local PFX=button("")
+local OB=button("")
+local EB=button("")
+local VB=button("")
+local SB=button("")
+local PostB=button("")
+local GB=button("")
+local ScanB=button("🔍 Force Rescan")
+local ResetB=button("♻️ Restore / Reset")
+
+label(PB,"🌱 Hide Plants",C.HidePlants)
+label(FB,"🍎 Hide Fruits",C.HideFruits)
+label(DB,"🪴 Hide Decorations",C.HideDecorations)
+label(PetB,"🐾 Hide Pets",C.HidePets)
+label(PFX,"🫧 Pet Rays / Orbs",C.PetEffects)
+label(OB,"👤 Hide Other Players",C.HideOtherPlayers)
+label(EB,"🌍 Hide Everything",C.HideEverything)
+label(VB,"✨ Disable VFX",C.DisableVFX)
+label(SB,"🌑 Disable Shadows",C.DisableShadows)
+label(PostB,"🌫️ Disable Post Effects",C.DisablePost)
+label(GB,"🎨 Lowest Graphics",C.LowGraphics)
+
+local function toggle(b,n,key)
+ b.Activated:Connect(function()
+  C[key]=not C[key]
+  label(b,n,C[key])
+
+  if C[key] then
+   stat(n.." enabled")
+   scan()
+  else
+   restore()
+   stat(n.." disabled / restored")
+   optimize()
+  end
+ end)
+end
+
+toggle(PB,"🌱 Hide Plants","HidePlants")
+toggle(FB,"🍎 Hide Fruits","HideFruits")
+toggle(DB,"🪴 Hide Decorations","HideDecorations")
+toggle(PetB,"🐾 Hide Pets","HidePets")
+toggle(PFX,"🫧 Pet Rays / Orbs","PetEffects")
+toggle(OB,"👤 Hide Other Players","HideOtherPlayers")
+toggle(EB,"🌍 Hide Everything","HideEverything")
+toggle(VB,"✨ Disable VFX","DisableVFX")
+toggle(SB,"🌑 Disable Shadows","DisableShadows")
+toggle(PostB,"🌫️ Disable Post Effects","DisablePost")
+toggle(GB,"🎨 Lowest Graphics","LowGraphics")
+
+ScanB.Activated:Connect(function()
+ stat("Scanning...")
+ scan()
+ task.delay(1,function()
+  if G.Parent then stat("Scan finished") end
+ end)
+end)
+
+ResetB.Activated:Connect(function()
+ restore()
+
+ for k in pairs(C) do
+  C[k]=false
+ end
+
+ label(PB,"🌱 Hide Plants",false)
+ label(FB,"🍎 Hide Fruits",false)
+ label(DB,"🪴 Hide Decorations",false)
+ label(PetB,"🐾 Hide Pets",false)
+ label(PFX,"🫧 Pet Rays / Orbs",false)
+ label(OB,"👤 Hide Other Players",false)
+ label(EB,"🌍 Hide Everything",false)
+ label(VB,"✨ Disable VFX",false)
+ label(SB,"🌑 Disable Shadows",false)
+ label(PostB,"🌫️ Disable Post Effects",false)
+ label(GB,"🎨 Lowest Graphics",false)
+
+ pcall(function() Lighting.GlobalShadows=oldShadows end)
+ pcall(function()
+  if oldQuality then
+   settings().Rendering.QualityLevel=oldQuality
+  end
+ end)
+
+ stat("Everything restored")
+end)
+
+-- Minimize only the MAIN optimizer GUI
+local minimized=false
+min.Activated:Connect(function()
+ minimized=not minimized
+ S.Visible=not minimized
+ status.Visible=not minimized
+ M.Size=minimized and UDim2.fromOffset(370,45) or UDim2.fromOffset(370,560)
+ min.Text=minimized and "+" or "-"
+end)
+
+-- Close only hides MAIN optimizer GUI.
+-- It DOES NOT disable ScreenGui, so the ⚡ button and performance monitor stay alive.
+close.Activated:Connect(function()
+ M.Visible=false
+end)
+
+-- Main GUI dragging
+local mainDrag=false
+local mainDragStart
+local mainStartPos
+
+T.InputBegan:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  mainDrag=true
+  mainDragStart=i.Position
+  mainStartPos=M.Position
+ end
+end)
+
+UIS.InputChanged:Connect(function(i)
+ if mainDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+  local d=i.Position-mainDragStart
+  M.Position=UDim2.new(
+   mainStartPos.X.Scale,mainStartPos.X.Offset+d.X,
+   mainStartPos.Y.Scale,mainStartPos.Y.Offset+d.Y
+  )
+ end
+end)
+
+UIS.InputEnded:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  mainDrag=false
+ end
+end)
+
+-- Floating button
+local F=Instance.new("TextButton")
+F.Size=UDim2.fromOffset(55,55)
+F.Position=UDim2.new(0,15,.7,0)
+F.BackgroundColor3=Color3.fromRGB(25,25,25)
+F.Text="⚡"
+F.TextSize=25
+F.TextColor3=Color3.new(1,1,1)
+F.ZIndex=20
+F.Parent=G
+Instance.new("UICorner",F).CornerRadius=UDim.new(1,0)
+
+-- IMPORTANT:
+-- The icon now toggles ONLY M.Visible.
+-- It never changes G.Enabled.
+local fd=false
+local fds
+local fps
+local moved=false
+
+F.InputBegan:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  fd=true
+  moved=false
+  fds=i.Position
+  fps=F.Position
+ end
+end)
+
+UIS.InputChanged:Connect(function(i)
+ if fd and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+  local d=i.Position-fds
+  if math.abs(d.X)>5 or math.abs(d.Y)>5 then
+   moved=true
+  end
+  F.Position=UDim2.new(
+   fps.X.Scale,fps.X.Offset+d.X,
+   fps.Y.Scale,fps.Y.Offset+d.Y
+  )
+ end
+end)
+
+UIS.InputEnded:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  if fd and not moved then
+   M.Visible=not M.Visible
+  end
+  fd=false
+ end
+end)
+
+-- Performance monitor
+-- It is a completely independent Frame.
+local PM=Instance.new("Frame")
+PM.Size=UDim2.fromOffset(220,150)
+PM.Position=UDim2.new(1,-235,0,20)
+PM.BackgroundColor3=Color3.fromRGB(15,15,15)
+PM.BorderSizePixel=0
+PM.ZIndex=10
+PM.Parent=G
+Instance.new("UICorner",PM).CornerRadius=UDim.new(0,10)
+
+local PT=Instance.new("TextLabel")
+PT.Size=UDim2.new(1,-35,0,30)
+PT.Position=UDim2.fromOffset(10,0)
+PT.BackgroundTransparency=1
+PT.Text="📊 PERFORMANCE"
+PT.TextColor3=Color3.new(1,1,1)
+PT.Font=Enum.Font.GothamBold
+PT.TextSize=14
+PT.TextXAlignment=Enum.TextXAlignment.Left
+PT.Parent=PM
+
+local PX=Instance.new("TextButton")
+PX.Size=UDim2.fromOffset(30,30)
+PX.Position=UDim2.new(1,-32,0,0)
+PX.BackgroundTransparency=1
+PX.Text="×"
+PX.TextColor3=Color3.new(1,1,1)
+PX.TextSize=18
+PX.Parent=PM
+
+local function ml(t,y)
+ local x=Instance.new("TextLabel")
+ x.Size=UDim2.new(1,-20,0,22)
+ x.Position=UDim2.fromOffset(10,y)
+ x.BackgroundTransparency=1
+ x.Text=t
+ x.TextColor3=Color3.new(1,1,1)
+ x.TextSize=13
+ x.Font=Enum.Font.Gotham
+ x.TextXAlignment=Enum.TextXAlignment.Left
+ x.Parent=PM
+ return x
+end
+
+local FL=ml("FPS: ...",35)
+local RL=ml("RAM: ...",60)
+local PL=ml("Ping: ...",85)
+local CL=ml("CPU: estimate",110)
+
+PX.Activated:Connect(function()
+ PM.Visible=false
+end)
+
+-- PERFORMANCE MONITOR DRAGGING
+-- You can drag it from the "📊 PERFORMANCE" title/header area.
+local pmDrag=false
+local pmDragStart
+local pmStartPos
+
+PT.InputBegan:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  pmDrag=true
+  pmDragStart=i.Position
+  pmStartPos=PM.Position
+ end
+end)
+
+UIS.InputChanged:Connect(function(i)
+ if pmDrag and (i.UserInputType==Enum.UserInputType.MouseMovement or i.UserInputType==Enum.UserInputType.Touch) then
+  local d=i.Position-pmDragStart
+  PM.Position=UDim2.new(
+   pmStartPos.X.Scale,pmStartPos.X.Offset+d.X,
+   pmStartPos.Y.Scale,pmStartPos.Y.Offset+d.Y
+  )
+ end
+end)
+
+UIS.InputEnded:Connect(function(i)
+ if i.UserInputType==Enum.UserInputType.MouseButton1 or i.UserInputType==Enum.UserInputType.Touch then
+  pmDrag=false
+ end
+end)
+
+-- FPS / RAM / Ping
+local frames,last=0,os.clock()
+
+RunService.RenderStepped:Connect(function()
+ frames+=1
+ local n=os.clock()
+
+ if n-last>=1 then
+  local fps=frames/(n-last)
+  frames=0
+  last=n
+
+  FL.Text=string.format("FPS: %.0f",fps)
+  CL.Text="CPU: "..(
+   fps>=55 and "Low" or
+   fps>=35 and "Medium" or
+   fps>=20 and "High" or
+   "Very High"
+  ).." (estimate)"
+ end
+end)
+
+task.spawn(function()
+ while G.Parent do
+  task.wait(1)
+
+  pcall(function()
+   RL.Text=string.format("RAM: %.0f MB",Stats:GetTotalMemoryUsageMb())
+  end)
+
+  pcall(function()
+   PL.Text=string.format(
+    "Ping: %.0f ms",
+    Stats.Network.ServerStatsItem["Data Ping"]:GetValue()
+   )
+  end)
+ end
+end)
+
+-- Auto process new objects
+Workspace.DescendantAdded:Connect(function(o)
+ task.defer(function()
+  if C.HidePlants or C.HideFruits or C.HideDecorations or
+     C.HidePets or C.PetEffects or C.HideOtherPlayers or
+     C.HideEverything or C.DisableVFX then
+   pcall(process,o)
+  end
+ end)
+end)
+
+-- Start
+task.spawn(function()
+ task.wait(1)
+
+ if not G.Parent then return end
+
+ stat("Applying optimization...")
+ optimize()
+
+ task.wait(2)
+
+ if G.Parent then
+  stat("Ready")
+ end
+end)
+
+print("GAG Extreme FPS Optimizer V2 - GUI FIXED loaded")
